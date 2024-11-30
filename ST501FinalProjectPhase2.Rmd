@@ -15,14 +15,44 @@ knitr::opts_chunk$set(echo = TRUE)
 
 The sharpe ratio is $\frac{\mu(\omega)}{\sigma(\omega)}$.
 
-$\mu(\omega) = \omega \mu_1+(1-\omega)\mu_2$\
-$\sigma(\omega) = \sqrt{\sigma_1^2\omega^2+\sigma_2^2(1-\omega)^2+2\rho\sigma_1\sigma_2\omega(1-\omega)}$\
-$SR(\omega) = \frac{\omega \mu_1+(1-\omega)\mu_2}{\sqrt{\sigma_1^2\omega^2+\sigma_2^2(1-\omega)^2+2\rho\sigma_1\sigma_2\omega(1-\omega)}}$\
-$\frac{d(SR(\omega))}{d\omega} = 1$\
-$\frac{d^2SR(\omega)}{d\omega^2} = 1$\
+$SR(\omega) = \frac{c_0+c_1\omega}{\sqrt{a\omega^2 -2b\omega +c}}$\
 When $\frac{d(SR(\omega))}{d\omega} = 0$ and$\frac{d^2SR(\omega)}{d\omega^2} \leq 0\text{, }\omega$ is the optimal value that maximize the sharpe ratio.
 
 ```{r}
+# if (!require(Deriv)) {install.packages("Deriv")} 
+library(Deriv)
+f <- function(omega, a, b, c, c0, c1) {
+  (c0 + c1 * omega) / sqrt(a * omega^2 - 2 * b * omega + c)
+}
+
+# find derivatives
+f_first <- Deriv(f, "omega", combine = TRUE)
+f_second <- Deriv(f_first, "omega", combine = TRUE)
+
+# extract intermediate variable expression
+extract_variables <- function(expr) {
+  expr_text <- deparse(expr)  
+  vars <- gregexpr("\\.e[0-9]+ <- .*", expr_text) 
+  matches <- regmatches(expr_text, vars)  
+  unlist(matches)  
+}
+
+# output intermediate variables
+cat("first order derivative intermediate variables:\n")
+cat(paste(extract_variables(body(f_first)), collapse = "\n"), "\n\n")
+
+cat("second order derivative intermediate variables:\n")
+cat(paste(extract_variables(body(f_second)), collapse = "\n"), "\n\n")
+
+# output first and second order derivatives
+cat("f'(x) =", deparse(body(f_first)), "\n")
+cat("f''(x) =", deparse(body(f_second)), "\n")
+```
+
+With these formulas, we can see that the second order derivatives always negative, so When $\exists \omega\in[0,1], \frac{d(SR(\omega))}{d\omega} = 0$, we can get the $\omega$ maximize the sharpe ratio directly by solving $\frac{d(SR(\omega))}{d\omega} = 0$. If the the global optimal $\omega \notin [0,1]$, if$\frac{d(SR(\omega))}{d\omega}|_{\omega=1} < 0, \frac{d(SR(\omega))}{d\omega}|_{\omega=0} < 0$, then optimal $\omega\in [0,1]$ is 0; else if $\frac{d(SR(\omega))}{d\omega}|_{\omega=1} > 0, \frac{d(SR(\omega))}{d\omega}|_{\omega=0} > 0$, then optimal $\omega\in [0,1]$ is 1.
+
+```{r}
+# Numerical Simulation
 mu1 <- 0.056   
 mu2 <- 0.04   
 sigma1 <- 0.1   
@@ -58,9 +88,9 @@ grid()
 ## 3
 
 ### 3.a
+
 ```{r}
-# 
-if (!requireNamespace("quantmod", quietly = TRUE)) install.packages("quantmod")
+# if (!requireNamespace("quantmod", quietly = TRUE)) install.package("quantmod")
 library(quantmod)
 
 # download data
@@ -104,8 +134,8 @@ sigma2_values <- sapply(w_values, sigma2)
 
 # plot sigma v.s. w
 plot(w_values, sigma2_values, type = "l", col = "blue", lwd = 2,
-     main = expression(sigma^2(w)~vs~w),
-     xlab = "w", ylab = expression(sigma^2(w)))
+     main = expression(sigma^2~vs~w),
+     xlab = "w", ylab = expression(sigma^2))
 
 # find minimum sigma
 opt_w <- optimize(sigma2, interval = c(0, 1))$minimum
@@ -150,9 +180,10 @@ cat(sprintf("Optimal w for Sharpe Ratio = %.2f, µ(w^) = %.4f, σ(w^) = %.4f, SR
 ### 3.d
 
 ```{r}
+# Using Historical return data
 # calculate VaR function 
 VaR <- function(returns, alpha) {
-  quantile(-returns, probs = alpha)
+  quantile(returns, probs = alpha)
 }
 
 # calculating VaR
@@ -161,15 +192,45 @@ VaR_AAPL <- sapply(alphas, VaR, returns = AAPL.returns)
 VaR_MSFT <- sapply(alphas, VaR, returns = MSFT.returns)
 
 # print VaR
-cat("VaR for AAPL:\n")
-print(round(VaR_AAPL, 4))
-cat("VaR for MSFT:\n")
-print(round(VaR_MSFT, 4))
+VaR_table <- data.frame(
+  Alpha = alphas,
+  VaR_AAPL = round(VaR_AAPL, 4),
+  VaR_MSFT = round(VaR_MSFT, 4)
+)
+print(VaR_table)
+```
+
+```{r}
+# Using Normal Distribution(Can be change to any other customized distribution) return
+# VaR based on Normal Distribution Return
+compute_var_normal <- function(mu, sigma, alpha) {
+  VaR <- abs(mu - sigma * qnorm(alpha))
+  return(VaR)
+}
+
+# Return Distribution Parameter Estimation
+mu_AAPL <- mean(AAPL.returns, na.rm = TRUE)
+sigma_AAPL <- sd(AAPL.returns, na.rm = TRUE)
+mu_MSFT <- mean(MSFT.returns, na.rm = TRUE)
+sigma_MSFT <- sd(MSFT.returns, na.rm = TRUE)
+
+# Single Stock VaR
+VaR_AAPL_normal <- sapply(alpha_values, compute_var_normal, mu = mu_AAPL, sigma = sigma_AAPL)
+VaR_MSFT_normal <- sapply(alpha_values, compute_var_normal, mu = mu_MSFT, sigma = sigma_MSFT)
+
+# Print VaRs
+VaR_table <- data.frame(
+  Alpha = alphas,
+  VaR_AAPL = round(VaR_AAPL_normal, 4),
+  VaR_MSFT = round(VaR_MSFT_normal, 4)
+)
+print(VaR_table)
 ```
 
 ### 3.e
 
 ```{r}
+# Using Historical Return Data
 # function to calculate Portfolio VaR
 VaR_portfolio <- function(w, alpha) {
   portfolio_returns <- w * AAPL.returns + (1 - w) * MSFT.returns
@@ -192,4 +253,33 @@ for (alpha in alphas) {
   cat(sprintf("Optimal w for VaR (alpha=%.3f): w = %.2f, µ(w^) = %.4f, σ(w^) = %.4f\n",
               alpha, opt_w_VaR, mu_opt_VaR, sigma_opt_VaR))
 }
+```
+When using Normal distribution as return distribution, all optimal $\omega $ to minimize the VaRs are the same, and they are the same as the $\omega$ to minimize $\sigma$ of the portfolio.
+
+```{r}
+# Using Normal Distribution Return
+# Compute Portfolio VaR
+VaR_portfolio_normal <- function(mu1, mu2, sigma1, sigma2, rho, alpha, w) {
+  mu_portfolio <- w * mu1 + (1 - w) * mu2
+  sigma_portfolio <- sqrt((w^2) * sigma1^2 + ((1 - w)^2) * sigma2^2 + 2 * w * (1 - w) * rho * sigma1 * sigma2)
+  compute_var_normal(mu_portfolio, sigma_portfolio, alpha)
+}
+
+# calculating w and VaR(w)
+for (alpha in alphas) {
+  VaR_values <- sapply(w_values, VaR_portfolio_normal, mu1 = mu_AAPL, mu2 = mu_MSFT, sigma1 = sigma_AAPL, sigma2 = sigma_MSFT, rho = rho, alpha = alpha)
+  plot(w_values, VaR_values, type = "l", lwd = 2,
+       main = bquote(VaR[.(alpha)](w)~vs~w),
+       xlab = "w", ylab = bquote(VaR[.(alpha)](w)))
+  
+  # optimize w to minimize VaR
+  opt_VaR <- optimize(VaR_portfolio, interval = c(0, 1), alpha = alpha)
+  opt_w_VaR <- opt_VaR$minimum
+  mu_opt_VaR <- c0 + c1 * opt_w_VaR
+  sigma_opt_VaR <- sqrt(sigma2(opt_w_VaR))
+  
+  cat(sprintf("Optimal w for VaR (alpha=%.3f): w = %.2f, µ(w^) = %.4f, σ(w^) = %.4f\n",
+              alpha, opt_w_VaR, mu_opt_VaR, sigma_opt_VaR))
+}
+
 ```
