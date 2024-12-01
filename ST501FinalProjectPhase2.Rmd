@@ -183,7 +183,7 @@ cat(sprintf("Optimal w for Sharpe Ratio = %.2f, µ(w^) = %.4f, σ(w^) = %.4f, SR
 # Using Historical return data
 # calculate VaR function 
 VaR <- function(returns, alpha) {
-  quantile(returns, probs = alpha)
+  quantile(-returns, probs = alpha)
 }
 
 # calculating VaR
@@ -204,7 +204,7 @@ print(VaR_table)
 # Using Normal Distribution(Can be change to any other customized distribution) return
 # VaR based on Normal Distribution Return
 compute_var_normal <- function(mu, sigma, alpha) {
-  VaR <- abs(mu - sigma * qnorm(alpha))
+  VaR <- -(mu - sigma * qnorm(alpha))
   return(VaR)
 }
 
@@ -215,8 +215,8 @@ mu_MSFT <- mean(MSFT.returns, na.rm = TRUE)
 sigma_MSFT <- sd(MSFT.returns, na.rm = TRUE)
 
 # Single Stock VaR
-VaR_AAPL_normal <- sapply(alpha_values, compute_var_normal, mu = mu_AAPL, sigma = sigma_AAPL)
-VaR_MSFT_normal <- sapply(alpha_values, compute_var_normal, mu = mu_MSFT, sigma = sigma_MSFT)
+VaR_AAPL_normal <- sapply(alphas, compute_var_normal, mu = mu_AAPL, sigma = sigma_AAPL)
+VaR_MSFT_normal <- sapply(alphas, compute_var_normal, mu = mu_MSFT, sigma = sigma_MSFT)
 
 # Print VaRs
 VaR_table <- data.frame(
@@ -254,7 +254,8 @@ for (alpha in alphas) {
               alpha, opt_w_VaR, mu_opt_VaR, sigma_opt_VaR))
 }
 ```
-When using Normal distribution as return distribution, all optimal $\omega $ to minimize the VaRs are the same, and they are the same as the $\omega$ to minimize $\sigma$ of the portfolio.
+
+When using Normal distribution as return distribution, all optimal \$\omega \$ to minimize the VaRs are the same, and they are the same as the $\omega$ to minimize $\sigma$ of the portfolio.
 
 ```{r}
 # Using Normal Distribution Return
