@@ -1,0 +1,443 @@
+---
+title: "Final Project"
+output:
+  word_document: default
+  pdf_document: default
+date: "2024-12-02"
+---
+
+## 1(a)
+
+$X_{(1)} \leq Q_p \leq X_{(n)}$ is satisfied if and only if at least one of the $X_i$ values is less than or equal to $Q_p$, and at least one of the $X_i$ values is greater than or equal to $Q_p$.
+
+The complementary event is that all $n$ observations are either below $Q_p$ or above $Q_p$.
+
+so that we can derive the probability of this event:
+
+$$
+Pr[X_{(1)} \leq Q_p \leq X_{(n)}] = 1 - Pr[\text{all } X_i < Q_p] - Pr[\text{all } X_i > Q_p].
+$$
+
+Since $X_i$ are i.i.d., we have:
+
+$$
+Pr[\text{all } X_i < Q_p] = p^n, \quad Pr[\text{all } X_i > Q_p] = (1 - p)^n.
+$$
+
+Thus, we get:
+
+$$
+Pr[X_{(1)} \leq Q_p \leq X_{(n)}] = 1 - p^n - (1 - p)^n.
+$$
+
+As a result, the minimal sample size n that satisfies the inequality depends only on p (and not on the unknown CDF F).
+
+## 1(b-c)
+
+```{r}
+# find the minimal n to satisfy the inequality
+find_min_n <- function(p, value1) {
+  n <- 1
+  while (TRUE) {
+    prob <- 1 - p^n - (1 - p)^n
+    if (prob >= value1) break
+    n <- n + 1
+  }
+  return(n)
+}
+
+# values for p
+p_values <- c(0.01, 0.025, 0.05, 0.10, 0.20, 0.40, 0.50)
+
+# let Pr=0.99
+n_99 <- sapply(p_values, function(p) find_min_n(p, 0.99))
+
+# let Pr=0.999
+n_999 <- sapply(p_values, function(p) find_min_n(p, 0.999))
+
+# Results
+results <- data.frame(p = p_values, n_99 = n_99, n_999=n_999)
+transposed_results <- t(results)
+print(transposed_results,row.names = FALSE)
+
+```
+
+## 2(a) Mean and Variance of Portfolio Return
+
+With two random variables $X_1$ and $X_2$ as the daily log return values of stock prices, we can calculate the portfolio return as:
+
+$$
+X(w) = w X_1 + (1 - w) X_2
+$$
+
+### Mean of the Portfolio Return
+
+So the expected value of $X(w)$ is:
+
+$$
+\mu(w) = E[X(w)] = w E[X_1] + (1 - w) E[X_2] = w \mu_1 + (1 - w) \mu_2 = \mu_2 + (\mu_1 - \mu_2) w
+$$
+
+As a result, we have:
+
+$$
+\mu(w) = c_0 + c_1 w
+$$
+
+where $c_0 = \mu_2$ and $c_1 = \mu_1 - \mu_2$.
+
+### Variance of the Portfolio Return
+
+The variance of the portfolio $X(w)$ is given by:
+
+$$
+\sigma^2(w) = \text{Var}[X(w)] = w^2 \sigma_1^2 + (1 - w)^2 \sigma_2^2 + 2w(1 - w) \rho \sigma_1 \sigma_2
+$$
+
+We can expand it as:
+
+$$
+\sigma^2(w) = (\sigma_1^2 + \sigma_2^2 - 2 \rho \sigma_1 \sigma_2) w^2 - 2 (\sigma_2^2 - \rho \sigma_1 \sigma_2) w + \sigma_2^2
+$$
+
+Let:
+
+-   $a = \sigma_1^2 + \sigma_2^2 - 2 \rho \sigma_1 \sigma_2$
+-   $b = \sigma_2^2 - \rho \sigma_1 \sigma_2$
+-   $c = \sigma_2^2$
+
+As a result, we can express the variance of the portfolio as:
+
+$$
+\sigma^2(w) = a w^2 - 2 b w + c
+$$
+
+### Justification for $a \geq 0$
+
+Because $\rho \in (-1, 1)$,
+
+$$
+a = \sigma_1^2 + \sigma_2^2 - 2 \rho \sigma_1 \sigma_2 \geq 2\sigma_1\sigma_2-2\rho \sigma_1 \sigma_2=(2-2\rho)\sigma_1 \sigma_2 \geq 0
+$$
+
+## 2(b) Minimizing the Portfolio Variance
+
+To minimize the variance $\sigma^2(w)$, we differentiate with respect to $w$:
+
+$$
+\frac{d}{dw} \sigma^2(w) = 2a w - 2b
+$$
+
+Setting the derivative equal to 0:
+
+$$
+2a w - 2b = 0
+$$ $$
+w = \frac{b}{a}
+$$
+
+Thus, the optimal weight $\hat{w}$ that minimizes variance is:
+
+$$
+\hat{w} = \frac{b}{a}
+$$
+
+### Case Analysis
+
+if $\frac{b}{a} < 0$, $b= \sigma_2^2 - \rho \sigma_1 \sigma_2<0$, then $\rho > \frac{\sigma_2}{\sigma_1}$, the variance is minimized when $\hat{w}=0$;
+
+if $\frac{b}{a} > 1$, then $\rho > \frac{\sigma_1}{\sigma_2}$, the variance is minimized when $\hat{w}=1$;
+
+otherwise, $\frac{b}{a}$ falls between 0 and 1, so when $\hat{w} = \frac{b}{a}$, the variance is minimized.
+
+## 2(c)
+
+The sharpe ratio is $\frac{\mu(\omega)}{\sigma(\omega)}$.
+
+$SR(\omega) = \frac{c_0+c_1\omega}{\sqrt{a\omega^2 -2b\omega +c}}$\
+When $\frac{d(SR(\omega))}{d\omega} = 0$ and$\frac{d^2SR(\omega)}{d\omega^2} \leq 0\text{, }\omega$ is the optimal value that maximize the sharpe ratio.
+
+```{r}
+# if (!require(Deriv)) {install.packages("Deriv")} 
+library(Deriv)
+f <- function(omega, a, b, c, c0, c1) {
+  (c0 + c1 * omega) / sqrt(a * omega^2 - 2 * b * omega + c)
+}
+
+# find derivatives
+f_first <- Deriv(f, "omega", combine = TRUE)
+f_second <- Deriv(f_first, "omega", combine = TRUE)
+
+# extract intermediate variable expression
+extract_variables <- function(expr) {
+  expr_text <- deparse(expr)  
+  vars <- gregexpr("\\.e[0-9]+ <- .*", expr_text) 
+  matches <- regmatches(expr_text, vars)  
+  unlist(matches)  
+}
+
+# output intermediate variables
+cat("first order derivative intermediate variables:\n")
+cat(paste(extract_variables(body(f_first)), collapse = "\n"), "\n\n")
+
+cat("second order derivative intermediate variables:\n")
+cat(paste(extract_variables(body(f_second)), collapse = "\n"), "\n\n")
+
+# output first and second order derivatives
+cat("f'(x) =", deparse(body(f_first)), "\n")
+cat("f''(x) =", deparse(body(f_second)), "\n")
+```
+
+With these formulas, we can see that the second order derivatives always negative, so When $\exists \omega\in[0,1], \frac{d(SR(\omega))}{d\omega} = 0$, we can get the $\omega$ maximize the sharpe ratio directly by solving $\frac{d(SR(\omega))}{d\omega} = 0$. If the the global optimal $\omega \notin [0,1]$, if$\frac{d(SR(\omega))}{d\omega}|_{\omega=1} < 0, \frac{d(SR(\omega))}{d\omega}|_{\omega=0} < 0$, then optimal $\omega\in [0,1]$ is 0; else if $\frac{d(SR(\omega))}{d\omega}|_{\omega=1} > 0, \frac{d(SR(\omega))}{d\omega}|_{\omega=0} > 0$, then optimal $\omega\in [0,1]$ is 1.
+
+```{r}
+# Numerical Simulation
+mu1 <- 0.056   
+mu2 <- 0.04   
+sigma1 <- 0.1   
+sigma2 <- 0.08 
+rho <- 0.2  # correlation coefficient of 1 and 2
+
+# calculate parameters
+c0 <- mu2
+c1 <- mu1 - mu2
+a <- sigma1^2 + sigma2^2 - 2 * rho * sigma1 * sigma2
+b <- sigma2^2 - rho * sigma1 * sigma2
+c <- sigma2^2
+
+# Sharpe Ratio function
+SR <- function(w) {
+  mu_w <- c0 + c1 * w
+  sigma_w <- sqrt(a * w^2 - 2 * b * w + c)
+  return(mu_w / sigma_w)
+}
+
+# generate weight array and Sharpe Ratio array
+w_values <- seq(0, 1, length.out = 500)
+sr_values <- sapply(w_values, SR)
+
+# plot Sharpe Ratio v.s. w
+plot(w_values, sr_values, type = "l", lwd = 2, col = "blue",
+     main = "Sharpe Ratio SR(w) vs Portfolio Weight w",
+     xlab = "Portfolio Weight w", ylab = "Sharpe Ratio SR(w)")
+abline(h = 0, col = "black", lty = 2)
+grid()
+```
+```{r}
+# Numerical Simulation
+mu1 <- 0.056   
+mu2 <- -0.04   
+sigma1 <- 0.1   
+sigma2 <- 0.08 
+rho <- 0.2  # correlation coefficient of 1 and 2
+
+# calculate parameters
+c0 <- mu2
+c1 <- mu1 - mu2
+a <- sigma1^2 + sigma2^2 - 2 * rho * sigma1 * sigma2
+b <- sigma2^2 - rho * sigma1 * sigma2
+c <- sigma2^2
+
+# generate weight array and Sharpe Ratio array
+w_values <- seq(0, 1, length.out = 500)
+sr_values <- sapply(w_values, SR)
+
+# plot Sharpe Ratio v.s. w
+plot(w_values, sr_values, type = "l", lwd = 2, col = "blue",
+     main = "Sharpe Ratio SR(w) vs Portfolio Weight w",
+     xlab = "Portfolio Weight w", ylab = "Sharpe Ratio SR(w)")
+abline(h = 0, col = "black", lty = 2)
+grid()
+```
+
+## 3
+
+### 3.a
+
+```{r}
+if (!requireNamespace("quantmod", quietly = TRUE)) install.package("quantmod")
+library(quantmod)
+
+# download data
+getSymbols(c("AAPL", "MSFT"), from = "2023-11-01", to = "2024-10-31")
+
+# calculate daily return
+AAPL.returns <- as.numeric(dailyReturn(AAPL)) * 100
+MSFT.returns <- as.numeric(dailyReturn(MSFT)) * 100
+
+# estimate moment
+mu1 <- mean(AAPL.returns)
+mu2 <- mean(MSFT.returns)
+sigma1 <- sd(AAPL.returns)
+sigma2 <- sd(MSFT.returns)
+rho <- cor(AAPL.returns, MSFT.returns)
+
+# print moment estimates
+cat(sprintf("µ1 = %.4f, µ2 = %.4f, σ1 = %.4f, σ2 = %.4f, ρ = %.4f\n", mu1, mu2, sigma1, sigma2, rho))
+
+# calculate parameter coefficient in 2(a)
+c0 <- mu2
+c1 <- mu1 - mu2
+a <- sigma1^2 + sigma2^2 - 2 * rho * sigma1 * sigma2
+b <- sigma2^2 - rho * sigma1 * sigma2
+c <- sigma2^2
+
+# print parameter coefficient in 2(a)
+cat(sprintf("c0 = %.4f, c1 = %.4f, a = %.4f, b = %.4f, c = %.4f\n", c0, c1, a, b, c))
+```
+
+### 3.b
+
+```{r}
+sigma2 <- function(w) {
+  a * w^2 - 2 * b * w + c
+}
+
+# generate weight w array and sigma array
+w_values <- seq(0, 1, length.out = 1000)
+sigma2_values <- sapply(w_values, sigma2)
+
+# plot sigma v.s. w
+plot(w_values, sigma2_values, type = "l", col = "blue", lwd = 2,
+     main = expression(sigma^2~vs~w),
+     xlab = "w", ylab = expression(sigma^2))
+
+# find minimum sigma
+opt_w <- optimize(sigma2, interval = c(0, 1))$minimum
+min_sigma2 <- sigma2(opt_w)
+mu_opt <- c0 + c1 * opt_w
+sigma_opt <- sqrt(min_sigma2)
+
+# output w minimizing sigma
+cat(sprintf("Optimal w = %.2f, µ(w^) = %.4f, σ(w^) = %.4f\n", opt_w, mu_opt, sigma_opt))
+```
+
+### 3.c
+
+```{r}
+# calculate sharpe ratio function
+sharpe_ratio <- function(w) {
+  mu_w <- c0 + c1 * w
+  sigma_w <- sqrt(a * w^2 - 2 * b * w + c)
+  mu_w / sigma_w
+}
+
+# calculate Sharpe Ratio
+sr_values <- sapply(w_values, sharpe_ratio)
+
+# plot w v.s. sharpe ratio
+plot(w_values, sr_values, type = "l", col = "blue", lwd = 2,
+     main = "Sharpe Ratio SR(w) vs w",
+     xlab = "w", ylab = "Sharpe Ratio SR(w)")
+
+# optimize w to maximize Sharpe ratio
+opt_sr <- optimize(sharpe_ratio, interval = c(0, 1), maximum = TRUE)
+opt_w_sr <- opt_sr$maximum
+max_sr <- opt_sr$objective
+mu_opt_sr <- c0 + c1 * opt_w_sr
+sigma_opt_sr <- sqrt(sigma2(opt_w_sr))
+
+# print optimal w and sharpe ratio
+cat(sprintf("Optimal w for Sharpe Ratio = %.2f, µ(w^) = %.4f, σ(w^) = %.4f, SR(w^) = %.4f\n",
+            opt_w_sr, mu_opt_sr, sigma_opt_sr, max_sr))
+```
+
+### 3.d
+
+```{r}
+# Using Historical return data
+# calculate VaR function 
+VaR <- function(returns, alpha) {
+  quantile(-returns, probs = alpha)
+}
+
+# calculating VaR
+alphas <- c(0.95, 0.975, 0.99)
+VaR_AAPL <- sapply(alphas, VaR, returns = AAPL.returns)
+VaR_MSFT <- sapply(alphas, VaR, returns = MSFT.returns)
+
+# print VaR
+VaR_table <- data.frame(
+  Alpha = alphas,
+  VaR_AAPL = round(VaR_AAPL, 4),
+  VaR_MSFT = round(VaR_MSFT, 4)
+)
+print(VaR_table)
+```
+
+```{r}
+# Using Normal Distribution(Can be change to any other customized distribution) return
+# VaR based on Normal Distribution Return
+compute_var_normal <- function(mu, sigma, alpha) {
+  VaR <- -(mu - sigma * qnorm(alpha))
+  return(VaR)
+}
+
+# Return Distribution Parameter Estimation
+mu_AAPL <- mean(AAPL.returns, na.rm = TRUE)
+sigma_AAPL <- sd(AAPL.returns, na.rm = TRUE)
+mu_MSFT <- mean(MSFT.returns, na.rm = TRUE)
+sigma_MSFT <- sd(MSFT.returns, na.rm = TRUE)
+
+# Single Stock VaR
+VaR_AAPL_normal <- sapply(alphas, compute_var_normal, mu = mu_AAPL, sigma = sigma_AAPL)
+VaR_MSFT_normal <- sapply(alphas, compute_var_normal, mu = mu_MSFT, sigma = sigma_MSFT)
+
+# Print VaRs
+VaR_table <- data.frame(
+  Alpha = alphas,
+  VaR_AAPL = round(VaR_AAPL_normal, 4),
+  VaR_MSFT = round(VaR_MSFT_normal, 4)
+)
+print(VaR_table)
+```
+
+### 3.e
+
+```{r}
+# Using Historical Return Data
+# function to calculate Portfolio VaR
+VaR_portfolio <- function(w, alpha) {
+  portfolio_returns <- w * AAPL.returns + (1 - w) * MSFT.returns
+  VaR(portfolio_returns, alpha)
+}
+
+# calculating w and VaR(w)
+for (alpha in alphas) {
+  VaR_values <- sapply(w_values, VaR_portfolio, alpha = alpha)
+  plot(w_values, VaR_values, type = "l", lwd = 2,
+       main = bquote(VaR[.(alpha)](w)~vs~w),
+       xlab = "w", ylab = bquote(VaR[.(alpha)](w)))
+  
+  # optimize w to minimize VaR
+  opt_VaR <- optimize(VaR_portfolio, interval = c(0, 1), alpha = alpha)
+  opt_w_VaR <- opt_VaR$minimum
+  mu_opt_VaR <- c0 + c1 * opt_w_VaR
+  sigma_opt_VaR <- sqrt(sigma2(opt_w_VaR))
+  
+  cat(sprintf("Optimal w for VaR (alpha=%.3f): w = %.2f, µ(w^) = %.4f, σ(w^) = %.4f\n",
+              alpha, opt_w_VaR, mu_opt_VaR, sigma_opt_VaR))
+}
+```
+
+When using Normal distribution as return distribution, all optimal \$\omega \$ to minimize the VaRs are the same, and they are the same as the $\omega$ to minimize $\sigma$ of the portfolio.
+
+```{r}
+# Using Normal Distribution Return
+# Compute Portfolio VaR
+VaR_portfolio_normal <- function(mu1, mu2, sigma1, sigma2, rho, alpha, w) {
+  mu_portfolio <- w * mu1 + (1 - w) * mu2
+  sigma_portfolio <- sqrt((w^2) * sigma1^2 + ((1 - w)^2) * sigma2^2 + 2 * w * (1 - w) * rho * sigma1 * sigma2)
+  compute_var_normal(mu_portfolio, sigma_portfolio, alpha)
+}
+
+# calculating w and VaR(w)
+for (alpha in alphas) {
+  VaR_values <- sapply(w_values, VaR_portfolio_normal, mu1 = mu_AAPL, mu2 = mu_MSFT, sigma1 = sigma_AAPL, sigma2 = sigma_MSFT, rho = rho, alpha = alpha)
+  plot(w_values, VaR_values, type = "l", lwd = 2,
+       main = bquote(VaR[.(alpha)](w)~vs~w),
+       xlab = "w", ylab = bquote(VaR[.(alpha)](w)))
+  
+}
+
+```
